@@ -1,0 +1,21 @@
+/* * { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: white; color: #eef2ff; }
+
+.container { max-width: 960px; margin: 0 auto; padding: 20px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.topbar nav a { margin-left: 12px; color: #a5b4fc; text-decoration: none; }
+.topbar nav a:hover { text-decoration: underline; }
+
+.card { background: #131a35; border: 1px solid #1f2650; border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+.input, .button, .select { padding: 10px 12px; border-radius: 10px; border: 1px solid #263069; background: #0f1530; color: #e2e8f0; }
+.button { cursor: pointer; }
+.row { display: flex; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+
+.badge { display:inline-block; padding: 4px 8px; background: #1f2937; border-radius: 8px; margin-left: 8px; color: #cbd5e1; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+.option { padding: 10px 12px; background: #0e1633; border: 1px solid #27306a; border-radius: 12px; cursor: pointer; }
+.option.disabled { opacity: 0.5; cursor: not-allowed; }
+
+.footer { opacity: 0.7; font-size: 12px; margin-top: 12px; text-align: center; } */

@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
-const path = require('path'); // <-- added
+const path = require('path');
 const mongoose = require('mongoose');
 const { Server } = require('socket.io');
 const Poll = require('./models/Poll');
@@ -15,8 +15,8 @@ app.use(cors({
 }));
 
 // --- Serve React build ---
-const clientDistPath  = path.join(__dirname, '../client/dist');
-app.use(express.static(clientDistPath ));
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
 
 // --- Health & Poll API ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
@@ -34,7 +34,7 @@ app.get('/polls/:id', async (req, res) => {
 
 // --- Serve React for all other routes ---
 app.get('*', (req, res) => {
-  res.sendFile(path.join(clientDistPath , 'index.html'));
+  res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
 const server = http.createServer(app);
@@ -67,11 +67,9 @@ function broadcastResults() {
 
 function broadcastParticipants() {
   const list = Array.from(students.values())
-    .filter(s => s.role === 'student')
-    .map(s => s.name);
+    .filter(s => s.role !== 'teacher'); // Corrected: Filter out the teacher role
   io.emit('chat:participants', list);
 }
-
 async function endPoll(reason = 'timeout') {
   if (!activePoll) return;
   if (activeTimer) clearTimeout(activeTimer);
@@ -103,6 +101,8 @@ io.on('connection', (socket) => {
 
   socket.on('register', ({ name, role }) => {
     students.set(socket.id, { name: name?.trim() || 'Guest', role: role || 'student' });
+    
+    // Corrected: Broadcast the participant list to all clients every time a user registers
     broadcastParticipants();
 
     if (activePoll) {
@@ -117,7 +117,16 @@ io.on('connection', (socket) => {
       broadcastResults();
     }
   });
+  
+  // Corrected: Send the participant list to the connecting client immediately
+  // This ensures a teacher joining will see all existing students.
+  socket.on('chat:join', ({ name, role }) => {
+  const list = Array.from(students.values())
+    .filter(s => s.role !== 'teacher'); // Exclude teacher
+  socket.emit('chat:participants', list);
+});
 
+  
   socket.on('teacher:createPoll', async ({ question, options, durationSec = 60 }) => {
     const sender = students.get(socket.id);
     if (!sender || sender.role !== 'teacher') return;

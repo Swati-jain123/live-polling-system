@@ -9,27 +9,23 @@ export default function Teacher() {
   const [counts, setCounts] = useState([]);
   const [pollHistory, setPollHistory] = useState([]);
   const [showCreator, setShowCreator] = useState(true);
+  const [creatorKey, setCreatorKey] = useState(Date.now());
+  const [showResults, setShowResults] = useState(false);
 
-  // Refs to store stable references to the latest state values
   const activeRef = useRef(active);
   const countsRef = useRef(counts);
 
-  useEffect(() => {
-    activeRef.current = active;
-  }, [active]);
-
-  useEffect(() => {
-    countsRef.current = counts;
-  }, [counts]);
+  useEffect(() => { activeRef.current = active; }, [active]);
+  useEffect(() => { countsRef.current = counts; }, [counts]);
 
   useEffect(() => {
     socket.emit("register", { name: "Teacher", role: "teacher" });
 
     const onStarted = (data) => {
-      // Poll has started on server, now switch view
       setActive(data);
       setCounts(new Array(data.options.length).fill(0));
       setShowCreator(false);
+      setShowResults(true);
     };
 
     const onUpdate = (data) => {
@@ -38,22 +34,24 @@ export default function Teacher() {
       }
     };
 
-    const onEnded = () => {
-      const finalActive = activeRef.current;
-      const finalCounts = countsRef.current;
-
-      if (finalActive) {
+    const onEnded = (data) => {
+      // This is the core change: we use a temporary listener to get the final state.
+      // This listener handles both timeout and manual ends.
+      if (activeRef.current && data.pollId === activeRef.current.pollId) {
+        // Save the final, correct state to history
         setPollHistory((prev) => [
           ...prev,
           {
-            question: finalActive.question,
-            options: finalActive.options,
-            counts: finalCounts,
+            question: activeRef.current.question,
+            options: activeRef.current.options,
+            counts: data.counts, // Use the final counts from the server
           },
         ]);
-        setActive(null);
-        setCounts([]);
       }
+      setActive(null);
+      setShowCreator(true);
+      setShowResults(false);
+      setCreatorKey(Date.now());
     };
 
     socket.on("poll:started", onStarted);
@@ -69,13 +67,19 @@ export default function Teacher() {
 
   const handleEndPoll = () => {
     socket.emit("teacher:endPoll");
+    // The view change logic is now handled by the onEnded event listener.
   };
 
   const handleAskNewQuestion = () => {
-    // When asking a new question, simply show the creator view
-    setActive(null);
-    setCounts([]);
-    setShowCreator(true);
+    // We can directly call end poll here, and the onEnded listener will
+    // handle the state update and view change.
+    if (active) {
+      socket.emit("teacher:endPoll");
+    } else {
+      // If there's no active poll, just switch to creator view
+      setShowCreator(true);
+      setCreatorKey(Date.now());
+    }
   };
 
   return (
@@ -83,6 +87,7 @@ export default function Teacher() {
       <div className="w-full max-w-3xl">
         {showCreator ? (
           <PollCreator
+            key={creatorKey}
             onPollStart={() => setShowCreator(false)}
           />
         ) : (
@@ -90,6 +95,7 @@ export default function Teacher() {
             active={active}
             counts={counts}
             pollHistory={pollHistory}
+            showResults={showResults}
             onEndPoll={handleEndPoll}
             onAskNewQuestion={handleAskNewQuestion}
           />

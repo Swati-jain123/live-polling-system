@@ -6,12 +6,19 @@ export default function ChatPopup({ role, name }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [activeTab, setActiveTab] = useState("chat");
-  const listRef = useRef(null);
   const [unread, setUnread] = useState(0);
   const [participants, setParticipants] = useState([]);
   const [kicked, setKicked] = useState(false);
+  const listRef = useRef(null);
 
-  // ✅ Listen for chat messages
+  // Emit join on mount
+  useEffect(() => {
+    // The server should broadcast the updated participant list
+    // to all connected clients after a user joins.
+    socket.emit("chat:join", { name, role });
+  }, [name, role]);
+
+  // Listen for chat messages
   useEffect(() => {
     const handler = (data) => {
       setMessages((prev) => [...prev, data]);
@@ -21,24 +28,28 @@ export default function ChatPopup({ role, name }) {
     return () => socket.off("chat:message", handler);
   }, [open]);
 
-  // ✅ Listen for participant list updates
+  // Listen for participant updates
   useEffect(() => {
+    // This handler will now be triggered whenever the server
+    // broadcasts a new participant list. This ensures real-time
+    // updates for everyone.
     const handler = (list) => setParticipants(list);
     socket.on("chat:participants", handler);
     return () => socket.off("chat:participants", handler);
-  }, []);
+  }, []); // Empty dependency array means it runs once on mount.
 
-  // ✅ Listen for being kicked
+  // Listen for being kicked
   useEffect(() => {
     const handler = () => {
       setKicked(true);
+      // It's better to disconnect here after the state is set
       socket.disconnect();
     };
     socket.on("chat:kicked", handler);
     return () => socket.off("chat:kicked", handler);
   }, []);
 
-  // ✅ Auto-scroll on new messages
+  // Auto-scroll chat
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -52,13 +63,15 @@ export default function ChatPopup({ role, name }) {
     setInput("");
   };
 
-  const kickUser = (user) => {
+  const kickUser = (userName) => {
     if (role === "teacher" || role === "admin") {
-      socket.emit("chat:kick", user);
+      // Server-side logic should handle kicking and then
+      // broadcast the updated participant list.
+      socket.emit("chat:kick", userName);
     }
   };
 
-  // ✅ Show "Kicked Out" UI
+  // Kicked out UI
   if (kicked) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -77,7 +90,6 @@ export default function ChatPopup({ role, name }) {
     );
   }
 
-  // ✅ Normal Chat UI
   return (
     <div className="fixed right-5 bottom-5 z-50">
       {/* Floating Chat Button */}
@@ -98,7 +110,7 @@ export default function ChatPopup({ role, name }) {
 
       {open && (
         <div className="absolute bottom-14 right-0 bg-white rounded-xl shadow-lg w-96 overflow-hidden border border-gray-300 h-96">
-          {/* Header Tabs */}
+          {/* Tabs */}
           <div className="flex border-b">
             <button
               onClick={() => setActiveTab("chat")}
@@ -129,9 +141,7 @@ export default function ChatPopup({ role, name }) {
                 {messages.map((m, i) => (
                   <div
                     key={i}
-                    className={`mb-3 ${
-                      m.sender === name ? "text-right" : "text-left"
-                    }`}
+                    className={`mb-3 ${m.sender === name ? "text-right" : "text-left"}`}
                   >
                     <div
                       className={`text-xs mb-1 ${
@@ -158,7 +168,7 @@ export default function ChatPopup({ role, name }) {
                   placeholder="Type a message..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => (e.key === "Enter" ? send() : null)}
+                  onKeyDown={(e) => e.key === "Enter" && send()}
                 />
                 <button
                   onClick={send}
@@ -177,24 +187,23 @@ export default function ChatPopup({ role, name }) {
                 <p className="text-gray-500">No participants yet.</p>
               ) : (
                 <>
-                     <div className="flex justify-between items-center border-b pb-2 mb-2 mx-2">
-        <span className="text-gray-600 font-semibold">Name</span>
-        {(role === "teacher" || role === "admin") && (
-          <span className="text-gray-600 font-semibold text-base">Action</span>
-        )}
-      </div>
+                  <div className="flex justify-between items-center border-b pb-2 mb-2 mx-2">
+                    <span className="text-gray-600 font-semibold">Name</span>
+                    {(role === "teacher" || role === "admin") && (
+                      <span className="text-gray-600 font-semibold text-base">Action</span>
+                    )}
+                  </div>
 
                   {participants.map((user, idx) => (
                     <div
                       key={idx}
                       className="flex justify-between items-center py-2 border-b"
                     >
-                      <span className="text-gray-700">{user}</span>
+                      <span className="text-gray-700">{user.name}</span>
 
-                      {(role === "teacher" || role === "admin") && (
-
+                      {(role === "teacher" || role === "admin") && user.role !== "teacher" && (
                         <button
-                          onClick={() => kickUser(user)}
+                          onClick={() => kickUser(user.name)}
                           className="text-lg text-blue-500 hover:underline text-base font-medium"
                         >
                           Kick out
